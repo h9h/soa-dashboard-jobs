@@ -1,0 +1,6 @@
+{
+  "JOB_PATH": "C:/Dashboard",
+  "MODEL_PATH": "C:/DashboardModel",
+  "LOCAL_SERVER_PORT": "4000",
+  "QUEUE_MAP_URL": "http://example.com/ceiser.interfaces/SenderFQN2QueueName.json"
+}
