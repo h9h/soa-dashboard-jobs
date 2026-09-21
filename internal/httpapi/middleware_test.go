@@ -1,7 +1,9 @@
 package httpapi
 
 import (
+	"bytes"
 	"io"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -122,5 +124,127 @@ func TestWithLoggingSkipsNoisyRoutes(t *testing.T) {
 		if skipLogging(target) {
 			t.Errorf("skipLogging(%q) = true, erwartet false", target)
 		}
+	}
+}
+
+func TestWithLoggingEmitsLogLine(t *testing.T) {
+	var buf bytes.Buffer
+	log.SetOutput(&buf)
+	t.Cleanup(func() { log.SetOutput(io.Discard) })
+
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/jobs", nil)
+
+	withLogging(withTiming(okHandler)).ServeHTTP(recorder, request)
+
+	output := buf.String()
+	if !strings.Contains(output, "GET") {
+		t.Errorf("Protokoll enthaelt GET nicht: %q", output)
+	}
+	if !strings.Contains(output, "/jobs") {
+		t.Errorf("Protokoll enthaelt /jobs nicht: %q", output)
+	}
+	fields := strings.Fields(output)
+	if len(fields) < 3 || fields[len(fields)-1] != "ms" || fields[len(fields)-3] != "-" {
+		t.Errorf("Protokoll hat falsches Format: %q", output)
+	}
+	if _, err := strconv.Atoi(fields[len(fields)-2]); err != nil {
+		t.Errorf("Protokoll enthaelt keine Millisekunden: %q", output)
+	}
+}
+
+func TestWithLoggingSkipsCheckalive(t *testing.T) {
+	var buf bytes.Buffer
+	log.SetOutput(&buf)
+	t.Cleanup(func() { log.SetOutput(io.Discard) })
+
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/checkalive", nil)
+
+	withLogging(withTiming(okHandler)).ServeHTTP(recorder, request)
+
+	if buf.String() != "" {
+		t.Errorf("Protokoll sollte leer sein fuer /checkalive, aber: %q", buf.String())
+	}
+}
+
+func TestWithLoggingLogsCheckaliveWithQuery(t *testing.T) {
+	var buf bytes.Buffer
+	log.SetOutput(&buf)
+	t.Cleanup(func() { log.SetOutput(io.Discard) })
+
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/checkalive?x=1", nil)
+
+	withLogging(withTiming(okHandler)).ServeHTTP(recorder, request)
+
+	output := buf.String()
+	if output == "" {
+		t.Error("Protokoll sollte Eintrag fuer /checkalive?x=1 enthalten")
+	}
+	if !strings.Contains(output, "/checkalive?x=1") {
+		t.Errorf("Protokoll enthaelt /checkalive?x=1 nicht: %q", output)
+	}
+}
+
+func TestWithLoggingWithoutTimingLayer(t *testing.T) {
+	var buf bytes.Buffer
+	log.SetOutput(&buf)
+	t.Cleanup(func() { log.SetOutput(io.Discard) })
+
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/job/save", nil)
+
+	withLogging(okHandler).ServeHTTP(recorder, request)
+
+	output := buf.String()
+	if output == "" {
+		t.Error("Protokoll sollte Eintrag fuer /job/save enthalten auch ohne Timing-Layer")
+	}
+	if !strings.Contains(output, "POST") {
+		t.Errorf("Protokoll enthaelt POST nicht: %q", output)
+	}
+}
+
+func TestWithTimingSetsResponseTimeHeaderOnEmptyBody(t *testing.T) {
+	emptyHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/jobs", nil)
+
+	withTiming(emptyHandler).ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Errorf("Status = %d, erwartet 200", recorder.Code)
+	}
+	value := recorder.Header().Get("X-Response-Time")
+	if value == "" {
+		t.Fatal("X-Response-Time fehlt bei leerem Rumpf")
+	}
+	if _, err := strconv.Atoi(value); err != nil {
+		t.Errorf("X-Response-Time = %q, erwartet eine Zahl in Millisekunden", value)
+	}
+}
+
+func TestWithCORSPassesThroughNonPreflightOptions(t *testing.T) {
+	reached := false
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		reached = true
+		_, _ = io.WriteString(w, "ok")
+	})
+
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodOptions, "/job/save", nil)
+	request.Header.Set("Origin", "http://localhost:3000")
+
+	withCORS(handler).ServeHTTP(recorder, request)
+
+	if !reached {
+		t.Error("OPTIONS ohne Access-Control-Request-Method sollte den Handler erreichen")
+	}
+	if got := recorder.Header().Get("Access-Control-Allow-Origin"); got != "http://localhost:3000" {
+		t.Errorf("Access-Control-Allow-Origin = %q", got)
 	}
 }
