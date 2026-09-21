@@ -48,10 +48,18 @@ func main() {
 
 	fmt.Print(helpText(cfg, dirCreated))
 
-	address := net.JoinHostPort("", cfg.Port)
-	if err := http.ListenAndServe(address, server.Handler()); err != nil {
+	if err := http.ListenAndServe(listenAddress(cfg.Port), server.Handler()); err != nil {
 		log.Fatalf("Server beendet: %v", err)
 	}
+}
+
+// listenAddress bindet bewusst nur an die Loopback-Adresse: der Dienst
+// kennt keine Authentisierung und spiegelt jeden Origin zurueck, deshalb
+// koennte sonst jede Webseite, die der Anwender besucht, das Dateisystem im
+// konfigurierten JOB_PATH veraendern. Sowohl die SPA als auch ein
+// vorgelagerter Webserver sprechen den Dienst vom selben Rechner aus an.
+func listenAddress(port string) string {
+	return net.JoinHostPort("127.0.0.1", port)
 }
 
 // applyPortArgument uebernimmt den Port aus dem ersten Positionsargument.

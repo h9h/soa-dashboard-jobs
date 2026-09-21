@@ -138,6 +138,17 @@ func TestHelpTextMentionsPortsPathsAndRoutes(t *testing.T) {
 	}
 }
 
+func TestListenAddressBindsOnlyToLoopback(t *testing.T) {
+	got := listenAddress("4000")
+
+	if got != "127.0.0.1:4000" {
+		t.Errorf("listenAddress(4000) = %q, erwartet 127.0.0.1:4000", got)
+	}
+	if strings.HasPrefix(got, ":") {
+		t.Errorf("listenAddress(4000) = %q, beginnt mit \":\" - das waere ein Bind an alle Schnittstellen", got)
+	}
+}
+
 func TestHelpTextWithoutNewDirectory(t *testing.T) {
 	text := helpText(testConfig(), false)
 
