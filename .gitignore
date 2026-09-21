@@ -1,0 +1,10 @@
+# Build output
+*.exe
+dist/
+
+# Local configuration (deployment specific)
+jobs.config.json
+
+# Editors
+.vscode/
+.idea/
