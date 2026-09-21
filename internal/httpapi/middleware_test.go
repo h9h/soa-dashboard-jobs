@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strconv"
 	"strings"
 	"testing"
@@ -15,6 +16,9 @@ import (
 var okHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 	_, _ = io.WriteString(w, "ok")
 })
+
+// silentHandler beruehrt den ResponseWriter ueberhaupt nicht.
+var silentHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
 
 func TestWithTimingSetsResponseTimeHeader(t *testing.T) {
 	recorder := httptest.NewRecorder()
@@ -130,7 +134,7 @@ func TestWithLoggingSkipsNoisyRoutes(t *testing.T) {
 func TestWithLoggingEmitsLogLine(t *testing.T) {
 	var buf bytes.Buffer
 	log.SetOutput(&buf)
-	t.Cleanup(func() { log.SetOutput(io.Discard) })
+	t.Cleanup(func() { log.SetOutput(os.Stderr) })
 
 	recorder := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodGet, "/jobs", nil)
@@ -156,7 +160,7 @@ func TestWithLoggingEmitsLogLine(t *testing.T) {
 func TestWithLoggingSkipsCheckalive(t *testing.T) {
 	var buf bytes.Buffer
 	log.SetOutput(&buf)
-	t.Cleanup(func() { log.SetOutput(io.Discard) })
+	t.Cleanup(func() { log.SetOutput(os.Stderr) })
 
 	recorder := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodGet, "/checkalive", nil)
@@ -171,7 +175,7 @@ func TestWithLoggingSkipsCheckalive(t *testing.T) {
 func TestWithLoggingLogsCheckaliveWithQuery(t *testing.T) {
 	var buf bytes.Buffer
 	log.SetOutput(&buf)
-	t.Cleanup(func() { log.SetOutput(io.Discard) })
+	t.Cleanup(func() { log.SetOutput(os.Stderr) })
 
 	recorder := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodGet, "/checkalive?x=1", nil)
@@ -190,7 +194,7 @@ func TestWithLoggingLogsCheckaliveWithQuery(t *testing.T) {
 func TestWithLoggingWithoutTimingLayer(t *testing.T) {
 	var buf bytes.Buffer
 	log.SetOutput(&buf)
-	t.Cleanup(func() { log.SetOutput(io.Discard) })
+	t.Cleanup(func() { log.SetOutput(os.Stderr) })
 
 	recorder := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/job/save", nil)
@@ -206,7 +210,7 @@ func TestWithLoggingWithoutTimingLayer(t *testing.T) {
 	}
 }
 
-func TestWithTimingSetsResponseTimeHeaderOnEmptyBody(t *testing.T) {
+func TestWithTimingSetsResponseTimeHeaderExplicitWriteHeader(t *testing.T) {
 	emptyHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
@@ -222,6 +226,24 @@ func TestWithTimingSetsResponseTimeHeaderOnEmptyBody(t *testing.T) {
 	value := recorder.Header().Get("X-Response-Time")
 	if value == "" {
 		t.Fatal("X-Response-Time fehlt bei leerem Rumpf")
+	}
+	if _, err := strconv.Atoi(value); err != nil {
+		t.Errorf("X-Response-Time = %q, erwartet eine Zahl in Millisekunden", value)
+	}
+}
+
+func TestWithTimingSetsResponseTimeHeaderSilentHandler(t *testing.T) {
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/jobs", nil)
+
+	withTiming(silentHandler).ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Errorf("Status = %d, erwartet 200", recorder.Code)
+	}
+	value := recorder.Header().Get("X-Response-Time")
+	if value == "" {
+		t.Fatal("X-Response-Time fehlt bei Handler der nichts beruehrt")
 	}
 	if _, err := strconv.Atoi(value); err != nil {
 		t.Errorf("X-Response-Time = %q, erwartet eine Zahl in Millisekunden", value)
