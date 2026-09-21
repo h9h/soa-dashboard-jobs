@@ -28,7 +28,7 @@ LDAP-Bibliotheken haengen an Nodes `net`-Modul.
 flowchart LR
   FE["React SPA<br/>rest-api-local.js"] -->|HTTP :4000| MW
   subgraph bin["soa-dashboard-jobs.exe"]
-    MW["httpapi: Middleware<br/>CORS · X-Response-Time · Logging · 32 MB Grenze"] --> R["httpapi: Routen und Handler"]
+    MW["httpapi: Middleware<br/>Logging · X-Response-Time · CORS · 32 MB Grenze"] --> R["httpapi: Routen und Handler"]
     R --> S["jobstore<br/>Auflisten/Lesen/Schreiben<br/>+ Pfadpruefung"]
     R --> C["config<br/>typisierte Werte + Extra"]
   end
@@ -130,8 +130,10 @@ stuetzt.
   client-seitig anhaengt.
 - `PUT /log` haengt den Rumpf ohne das Feld `destination` samt `,\n` an.
 - `GET /config/:name` meldet `nok`, wenn der Wert fehlt oder leer ist.
-- Schreibzugriffe landen ausschliesslich direkt in `JOB_PATH`. Unterverzeichnisse,
-  absolute Pfade und `..` werden mit `invalid file` abgelehnt.
+- Sowohl Lese- als auch Schreibzugriffe (`GET /job`, `GET /model`, `POST /job/save`,
+  `PUT /log`) sind auf direkte Eintraege in `JOB_PATH` bzw. `MODEL_PATH` beschraenkt.
+  Unterverzeichnisse, absolute Pfade und `..` werden mit `invalid file` abgelehnt,
+  weil alle vier Routen denselben Pfadpruefungscode in `internal/jobstore` nutzen.
 
 ## Entwickeln
 
@@ -165,11 +167,11 @@ go build -ldflags "-X main.version=1.2.3" -o soa-dashboard-jobs.exe .
 3. **Verzeichnisanlage.** Fehlende Elternverzeichnisse von `JOB_PATH` werden
    mit angelegt. Die Node-Fassung legte nur die letzte Ebene an.
 4. **Version.** Kommt aus `-ldflags` statt aus `frontend/package.json`.
-5. **Doppelpunkt im Dateinamen.** Job- und Lognamen mit `:` werden mit
-   `invalid file` abgelehnt. Auf NTFS eroeffnet ein Doppelpunkt einen
-   alternativen Datenstrom; die Node-Fassung schrieb dadurch unbemerkt in
-   einen versteckten Stream statt in eine Datei. Go schlaegt stattdessen
-   kontrolliert fehl.
+5. **Doppelpunkt im Dateinamen.** Job-, Log- und Modellnamen mit `:` werden bei
+   Lese- wie Schreibzugriffen mit `invalid file` abgelehnt. Auf NTFS eroeffnet
+   ein Doppelpunkt einen alternativen Datenstrom; die Node-Fassung schrieb
+   dadurch unbemerkt in einen versteckten Stream statt in eine Datei. Go
+   schlaegt stattdessen kontrolliert fehl.
 6. **Portpruefung beim Start.** Ein ungueltiges Portargument (nicht
    numerisch, `0` oder ausserhalb von 1-65535) wird beim Start abgelehnt.
    Die Node-Fassung akzeptierte auch `0` und band dabei einen zufaelligen,

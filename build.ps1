@@ -16,6 +16,24 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+# $ErrorActionPreference greift nur bei PowerShell-eigenen (terminierenden)
+# Fehlern, nicht bei einem von Null verschiedenen Exit-Code eines nativen
+# Kommandos wie go.exe. Invoke-Step prueft daher nach jedem Schritt explizit
+# $LASTEXITCODE und bricht andernfalls ab - sonst wuerde ein fehlgeschlagener
+# vet/test/build-Schritt stillschweigend uebergangen und trotzdem eine .exe
+# erzeugt bzw. "Fertig" ausgegeben.
+function Invoke-Step {
+    param(
+        [string]$Name,
+        [scriptblock]$Action
+    )
+    & $Action
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "Abgebrochen: $Name fehlgeschlagen (Exit-Code $LASTEXITCODE)"
+        exit $LASTEXITCODE
+    }
+}
+
 if (-not $Version) {
     $Version = (git describe --tags --always --dirty 2>$null)
     if (-not $Version) { $Version = "dev" }
@@ -27,8 +45,8 @@ $env:GOOS = "windows"
 $env:GOARCH = "amd64"
 $env:CGO_ENABLED = "0"
 
-go vet ./...
-go test ./...
-go build -trimpath -ldflags "-s -w -X main.version=$Version" -o $Output .
+Invoke-Step "go vet" { go vet ./... }
+Invoke-Step "go test" { go test ./... }
+Invoke-Step "go build" { go build -trimpath -ldflags "-s -w -X main.version=$Version" -o $Output . }
 
 Write-Host "Fertig: $Output"
