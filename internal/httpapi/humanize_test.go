@@ -48,3 +48,27 @@ func TestRelativeTimeHandlesNegativeDurations(t *testing.T) {
 		t.Errorf("relativeTime(negativ) = %q", got)
 	}
 }
+
+func TestRelativeTimeFractionalDurations(t *testing.T) {
+	cases := []struct {
+		duration time.Duration
+		want     string
+	}{
+		// Exact regression from re-review: 289.3 days must be "10 months ago", not "9 months ago"
+		{6943*time.Hour + 12*time.Minute, "10 months ago"},
+		// Inside the window where day-based arm and moment disagreed: 319.55 days
+		{7669*time.Hour + 12*time.Minute, "10 months ago"},
+		// Fractional seconds: must be "a minute ago", not "1 minutes ago"
+		{89*time.Second + 750*time.Millisecond, "a minute ago"},
+		// Fractional minutes: must be "an hour ago", not "1 hours ago"
+		{89*time.Minute + 45*time.Second, "an hour ago"},
+		// Fractional hours: must be "a day ago", not "1 days ago"
+		{35*time.Hour + 45*time.Minute, "a day ago"},
+	}
+
+	for _, tc := range cases {
+		if got := relativeTime(tc.duration); got != tc.want {
+			t.Errorf("relativeTime(%v) = %q, erwartet %q", tc.duration, got, tc.want)
+		}
+	}
+}

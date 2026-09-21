@@ -10,7 +10,8 @@ const hoursPerDay = 24
 
 // relativeTime bildet moment().from() in der englischen Lokalisierung nach,
 // die das Node-Original fuer das Feld process-start verwendet hat. Die
-// Schwellwerte stammen aus momentjs (relativeTime thresholds).
+// Bedingungskette spiegelt moment's relativeTime wider und vergleicht den
+// abgerundeten Wert der naechst groesseren Einheit.
 //
 // momentjs rechnet Tage in Monate um ueber daysToMonths: 400 Jahre haben
 // 146097 Tage und 4800 Monate. Ein flacher 30-Tage-Monat waerae davon in
@@ -25,33 +26,35 @@ func relativeTime(d time.Duration) string {
 		d = 0
 	}
 
+	exactDays := d.Hours() / hoursPerDay
+
 	seconds := int(math.Round(d.Seconds()))
 	minutes := int(math.Round(d.Minutes()))
 	hours := int(math.Round(d.Hours()))
-	days := int(math.Round(d.Hours() / hoursPerDay))
-	months := int(math.Round(float64(days) / daysPerMonth))
-	years := int(math.Round(float64(days) / daysPerYear))
+	days := int(math.Round(exactDays))
+	months := int(math.Round(exactDays / daysPerMonth))
+	years := int(math.Round(exactDays / daysPerYear))
 
 	switch {
-	case seconds < 45:
+	case seconds <= 44:
 		return "a few seconds ago"
-	case seconds < 90:
+	case minutes <= 1:
 		return "a minute ago"
 	case minutes < 45:
 		return fmt.Sprintf("%d minutes ago", minutes)
-	case minutes < 90:
+	case hours <= 1:
 		return "an hour ago"
 	case hours < 22:
 		return fmt.Sprintf("%d hours ago", hours)
-	case hours < 36:
+	case days <= 1:
 		return "a day ago"
 	case days < 26:
 		return fmt.Sprintf("%d days ago", days)
-	case days < 46:
+	case months <= 1:
 		return "a month ago"
-	case days < 320:
+	case months < 11:
 		return fmt.Sprintf("%d months ago", months)
-	case days < 548:
+	case years <= 1:
 		return "a year ago"
 	default:
 		return fmt.Sprintf("%d years ago", years)
