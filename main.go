@@ -55,12 +55,16 @@ func main() {
 }
 
 // applyPortArgument uebernimmt den Port aus dem ersten Positionsargument.
-// Das Node-Original hat process.argv[2] genauso ausgewertet.
+// Das Node-Original hat process.argv[2] genauso ausgewertet, jedoch ohne
+// Bereichspruefung. Diese Abweichung ist bewusst: sie verhindert, dass der
+// Server unbemerkt auf einem von der API abweichenden Port lauscht (Port 0
+// laesst das Betriebssystem einen zufaelligen Port waehlen).
 func applyPortArgument(cfg *config.Config, args []string) error {
 	if len(args) == 0 || args[0] == "" {
 		return nil
 	}
-	if _, err := strconv.Atoi(args[0]); err != nil {
+	port, err := strconv.Atoi(args[0])
+	if err != nil || port < 1 || port > 65535 {
 		return fmt.Errorf("ungueltiger Port %q", args[0])
 	}
 
