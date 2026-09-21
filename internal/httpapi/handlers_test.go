@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -200,6 +201,65 @@ func TestGetConfig(t *testing.T) {
 	}
 }
 
+// TestHandlerWiresAllMiddleware fuehrt eine Anfrage durch den echten, von
+// Server.Handler() verdrahteten Handler und prueft in einem Zug alle vier
+// beobachtbaren Effekte der Middlewarekette. Ein Mutationstest hat gezeigt,
+// dass die uebrigen Tests in diesem Paket gruen bleiben, selbst wenn
+// Handler() nur noch "return mux" macht oder withCORS herausgenommen wird -
+// dieser Test soll genau das aufdecken.
+func TestHandlerWiresAllMiddleware(t *testing.T) {
+	handler, _, _ := newTestServer(t)
+
+	request := httptest.NewRequest(http.MethodGet, "/jobs", nil)
+	request.Header.Set("Origin", "http://localhost:3000")
+
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, request)
+
+	if got := recorder.Header().Get("Access-Control-Allow-Origin"); got != "http://localhost:3000" {
+		t.Errorf("Access-Control-Allow-Origin = %q, withCORS scheint nicht verdrahtet zu sein", got)
+	}
+	if got := recorder.Header().Get("Vary"); got != "Origin" {
+		t.Errorf("Vary = %q, erwartet Origin", got)
+	}
+
+	responseTime := recorder.Header().Get("X-Response-Time")
+	if responseTime == "" {
+		t.Fatal("X-Response-Time fehlt, withTiming scheint nicht verdrahtet zu sein")
+	}
+	if _, err := strconv.Atoi(responseTime); err != nil {
+		t.Errorf("X-Response-Time = %q, erwartet eine Zahl in Millisekunden", responseTime)
+	}
+
+	if got := recorder.Header().Get("Content-Type"); got != "application/json; charset=utf-8" {
+		t.Errorf("Content-Type = %q, erwartet application/json; charset=utf-8 - die Route scheint nicht erreicht worden zu sein", got)
+	}
+}
+
+// TestHandlerAnswersPreflightWithoutReachingRoute prueft, dass ein Preflight
+// durch den echten Handler() bereits von withCORS mit 204 beantwortet wird,
+// bevor Logging, Timing oder eine Route ueberhaupt erreicht werden.
+func TestHandlerAnswersPreflightWithoutReachingRoute(t *testing.T) {
+	handler, _, _ := newTestServer(t)
+
+	request := httptest.NewRequest(http.MethodOptions, "/jobs", nil)
+	request.Header.Set("Origin", "http://localhost:3000")
+	request.Header.Set("Access-Control-Request-Method", "GET")
+
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusNoContent {
+		t.Errorf("Status = %d, erwartet 204", recorder.Code)
+	}
+	if recorder.Body.Len() != 0 {
+		t.Errorf("Preflight-Antwort sollte leer sein, war aber %q", recorder.Body.String())
+	}
+	if got := recorder.Header().Get("Content-Type"); got == "application/json; charset=utf-8" {
+		t.Errorf("Content-Type = %q, der Preflight hat offenbar eine Route erreicht", got)
+	}
+}
+
 func TestUnknownRouteIs404(t *testing.T) {
 	handler, _, _ := newTestServer(t)
 
@@ -240,6 +300,54 @@ func TestSaveJobAppendsChunks(t *testing.T) {
 	}
 	if string(content) != "einszwei" {
 		t.Errorf("Datei = %q", content)
+	}
+}
+
+func TestSaveJobMissingChunkIsRejectedWithoutCreatingFile(t *testing.T) {
+	handler, jobRoot, _ := newTestServer(t)
+
+	_, body := do(t, handler, http.MethodPost, "/job/save", `{"jobname":"lauf","append":false}`)
+
+	if string(body) != `{"result":"missing chunk"}` {
+		t.Errorf("Antwort = %s", body)
+	}
+	if _, err := os.Stat(filepath.Join(jobRoot, "lauf.job.json")); !os.IsNotExist(err) {
+		t.Errorf("Datei haette nicht angelegt werden duerfen: Stat-Fehler = %v", err)
+	}
+}
+
+func TestSaveJobMissingChunkDoesNotTouchExistingFile(t *testing.T) {
+	handler, jobRoot, _ := newTestServer(t)
+	writeFile(t, jobRoot, "lauf.job.json", "vorhandener inhalt")
+
+	_, body := do(t, handler, http.MethodPost, "/job/save", `{"jobname":"lauf","append":false}`)
+
+	if string(body) != `{"result":"missing chunk"}` {
+		t.Errorf("Antwort = %s", body)
+	}
+	content, err := os.ReadFile(filepath.Join(jobRoot, "lauf.job.json"))
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	if string(content) != "vorhandener inhalt" {
+		t.Errorf("Datei wurde veraendert: %q", content)
+	}
+}
+
+func TestSaveJobExplicitEmptyChunkIsHonoured(t *testing.T) {
+	handler, jobRoot, _ := newTestServer(t)
+
+	_, body := do(t, handler, http.MethodPost, "/job/save", `{"jobname":"lauf","chunk":"","append":false}`)
+
+	if string(body) != `{"result":"ok"}` {
+		t.Fatalf("Antwort = %s", body)
+	}
+	content, err := os.ReadFile(filepath.Join(jobRoot, "lauf.job.json"))
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	if string(content) != "" {
+		t.Errorf("Datei = %q, erwartet eine leere, aber angelegte Datei", content)
 	}
 }
 

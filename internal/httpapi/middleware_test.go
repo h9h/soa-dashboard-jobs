@@ -250,6 +250,35 @@ func TestWithTimingSetsResponseTimeHeaderSilentHandler(t *testing.T) {
 	}
 }
 
+// TestFullChainSkipsLoggingOnPreflight bildet die tatsaechliche Reihenfolge
+// aus Handler() nach: CORS liegt ausserhalb von Logging und beantwortet einen
+// Preflight, bevor next.ServeHTTP ueberhaupt aufgerufen wird. Das Node-Original
+// protokollierte Preflights nicht, weil @koa/cors vor der Logging-Middleware
+// registriert ist und bei einem Preflight kein next() aufruft; die SPA
+// preflightet POST /job/save bei einem grossen Job etwa alle 5 Sekunden neu,
+// das waere sonst staendiges Rauschen im Protokoll.
+func TestFullChainSkipsLoggingOnPreflight(t *testing.T) {
+	var buf bytes.Buffer
+	log.SetOutput(&buf)
+	t.Cleanup(func() { log.SetOutput(os.Stderr) })
+
+	chain := withCORS(withLogging(withTiming(okHandler)))
+
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodOptions, "/job/save", nil)
+	request.Header.Set("Origin", "http://localhost:3000")
+	request.Header.Set("Access-Control-Request-Method", "POST")
+
+	chain.ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusNoContent {
+		t.Fatalf("Status = %d, erwartet 204", recorder.Code)
+	}
+	if buf.String() != "" {
+		t.Errorf("Protokoll sollte bei einem Preflight leer sein, war aber: %q", buf.String())
+	}
+}
+
 func TestWithCORSPassesThroughNonPreflightOptions(t *testing.T) {
 	reached := false
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

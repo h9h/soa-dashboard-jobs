@@ -54,15 +54,15 @@ func TestRelativeTimeFractionalDurations(t *testing.T) {
 		duration time.Duration
 		want     string
 	}{
-		// Exact regression from re-review: 289.3 days must be "10 months ago", not "9 months ago"
+		// 289,3 Tage: muss "10 months ago" ergeben, nicht "9 months ago"
 		{6943*time.Hour + 12*time.Minute, "10 months ago"},
-		// Inside the window where day-based arm and moment disagreed: 319.55 days
+		// Grenzfall, in dem die tagesbasierte Rundung und moment auseinanderlaufen: 319,55 Tage
 		{7669*time.Hour + 12*time.Minute, "10 months ago"},
-		// Fractional seconds: must be "a minute ago", not "1 minutes ago"
+		// Sekundenbruchteile: muss "a minute ago" ergeben, nicht "1 minutes ago"
 		{89*time.Second + 750*time.Millisecond, "a minute ago"},
-		// Fractional minutes: must be "an hour ago", not "1 hours ago"
+		// Minutenbruchteile: muss "an hour ago" ergeben, nicht "1 hours ago"
 		{89*time.Minute + 45*time.Second, "an hour ago"},
-		// Fractional hours: must be "a day ago", not "1 days ago"
+		// Stundenbruchteile: muss "a day ago" ergeben, nicht "1 days ago"
 		{35*time.Hour + 45*time.Minute, "a day ago"},
 	}
 

@@ -28,7 +28,7 @@ LDAP-Bibliotheken haengen an Nodes `net`-Modul.
 flowchart LR
   FE["React SPA<br/>rest-api-local.js"] -->|HTTP :4000| MW
   subgraph bin["soa-dashboard-jobs.exe"]
-    MW["httpapi: Middleware<br/>Logging · X-Response-Time · CORS · 32 MB Grenze"] --> R["httpapi: Routen und Handler"]
+    MW["httpapi: Middleware<br/>32 MB Grenze · CORS · Logging · X-Response-Time"] --> R["httpapi: Routen und Handler"]
     R --> S["jobstore<br/>Auflisten/Lesen/Schreiben<br/>+ Pfadpruefung"]
     R --> C["config<br/>typisierte Werte + Extra"]
   end
@@ -180,6 +180,26 @@ go build -ldflags "-X main.version=1.2.3" -o soa-dashboard-jobs.exe .
 7. **`process-start` in `/checkalive`.** Die relative Zeitangabe bildet die
    Schwellenwerte von momentjs nach, einschliesslich seines gregorianischen
    Monats von 146097/4800 Tagen.
+8. **Zu grosser Anfragerumpf.** Ueber 32 MiB warf koa-bodyparser eine
+   Ausnahme, die Koa mit Status 413 beantwortete. Dieser Dienst antwortet
+   stattdessen mit Status 200 und `{"result":"http: request body too large"}`,
+   konsistent mit der Regel, dass jede Route mit 200 antwortet. Von der
+   Oberflaeche aus ist das nicht erreichbar, weil sie in 64-KiB-Stuecken
+   sendet.
+9. **Zahlenwerte in `/log`.** `StripKey` uebernimmt Werte byteweise, daher
+   bleibt `1.50` als `1.50` erhalten und eine 21-stellige Ganzzahl behaelt
+   alle Stellen. Die Node-Fassung ging den Umweg ueber `JSON.parse`/
+   `JSON.stringify`, wodurch `1.5` geschrieben und Praezision oberhalb von
+   2^53 verloren wurde. Das Go-Verhalten ist das sicherere, aber die
+   Logbytes sind fuer solche Eingaben nicht mehr identisch mit denen der
+   Node-Fassung.
+10. **Bindung nur an localhost.** Der Dienst lauscht ausschliesslich auf
+    `127.0.0.1`, die Node-Fassung band alle Schnittstellen. Der Dienst kennt
+    keine Authentisierung und spiegelt jeden Origin zurueck; beide
+    dokumentierten Einsatzarten (SPA und vorgelagerter Webserver) sprechen
+    ihn ohnehin vom selben Rechner aus an. Wird ein Zugriff von einem
+    anderen Rechner benoetigt, gehoert ein Reverse-Proxy davor - nicht eine
+    Aenderung an dieser Binary.
 
 ## Lizenz
 

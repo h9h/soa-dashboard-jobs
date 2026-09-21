@@ -145,7 +145,7 @@ func resolve(root, name string) (string, error) {
 		return "", ErrInvalidFile
 	}
 	// Auf NTFS ist ein Doppelpunkt im Dateinamen der Trennzeichen fuer
-	// alternative Datenströeme. Ein Name wie "C:foo" wuerde einen versteckten
+	// alternative Datenstroeme. Ein Name wie "C:foo" wuerde einen versteckten
 	// Stream auf einer Datei namens "C" oeffnen, nicht auf "C:foo". Das ist
 	// bewusst strenger als das Node-Original, aendert aber nur bereits kaputte
 	// Eingaben und verhindert stille Schreibfehler.

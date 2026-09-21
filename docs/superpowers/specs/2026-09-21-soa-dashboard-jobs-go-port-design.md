@@ -163,10 +163,14 @@ Middleware chain, outermost first:
    it is not), `Vary: Origin` is set, allowed methods are
    `GET, HEAD, PUT, POST, DELETE, PATCH`, the requested
    `Access-Control-Request-Headers` are reflected, and preflight `OPTIONS` is
-   answered with 204.
-3. **Timing** — sets `X-Response-Time: <ms>` before the body is written.
-4. **Logging** — `GET /jobs - 3 ms` to stdout, skipping `/checkalive` and `/log`
-   exactly as the Node version does.
+   answered with 204 — before logging or timing ever run, matching Koa, where
+   `@koa/cors` sits ahead of the logging middleware and never calls `next()`
+   for a preflight.
+3. **Logging** — `GET /jobs - 3 ms` to stdout, skipping `/checkalive` and `/log`
+   exactly as the Node version does. Sits outside timing so it can read the
+   `X-Response-Time` header that timing sets on the way back out through the
+   chain.
+4. **Timing** — sets `X-Response-Time: <ms>` before the body is written.
 
 All JSON is written with `json.Encoder` and `SetEscapeHTML(false)` so `<`, `>` and
 `&` are emitted literally, as `JSON.stringify` does.
@@ -227,6 +231,14 @@ Details:
 4. **Configuration format.** `customisation/jobs.config.js` (a CommonJS module)
    becomes `jobs.config.json` plus `SOA_JOBS_*` environment overrides. Go cannot
    `require()` JavaScript.
+5. **Listen address.** The Go service binds only `127.0.0.1`; the Node original
+   bound all interfaces. The service has no authentication and reflects any
+   `Origin`, so an all-interfaces bind would let any reachable host write into
+   `JOB_PATH`. Both documented deployments (the SPA, and a reverse proxy) talk
+   to it from the same machine, so this closes real exposure at no cost. Not
+   configurable by design — a config key would let a future edit silently
+   reopen it. A deployment needing remote access should put a reverse proxy in
+   front instead.
 
 ## Error handling
 

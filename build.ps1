@@ -41,12 +41,13 @@ if (-not $Version) {
 
 Write-Host "Baue $Output (Version $Version)"
 
+Invoke-Step "go vet" { go vet ./... }
+Invoke-Step "go test" { go test ./... }
+
 $env:GOOS = "windows"
 $env:GOARCH = "amd64"
 $env:CGO_ENABLED = "0"
 
-Invoke-Step "go vet" { go vet ./... }
-Invoke-Step "go test" { go test ./... }
 Invoke-Step "go build" { go build -trimpath -ldflags "-s -w -X main.version=$Version" -o $Output . }
 
 Write-Host "Fertig: $Output"

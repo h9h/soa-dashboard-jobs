@@ -33,7 +33,7 @@ func (s *Server) handleListJobs(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleGetJob(w http.ResponseWriter, r *http.Request) {
 	content, err := s.store.GetJob(r.PathValue("jobname"))
 	if err != nil {
-		writeJSON(w, jobResponse{Status: err.Error()})
+		writeJSON(w, jobResponse{Status: errorText(err)})
 		return
 	}
 	writeJSON(w, jobResponse{Status: "ok", Job: &content})
@@ -43,7 +43,7 @@ func (s *Server) handleGetJob(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleGetModel(w http.ResponseWriter, r *http.Request) {
 	content, err := s.store.GetModel(r.PathValue("name"))
 	if err != nil {
-		writeJSON(w, modelResponse{Status: err.Error()})
+		writeJSON(w, modelResponse{Status: errorText(err)})
 		return
 	}
 	writeJSON(w, modelResponse{Status: "ok", Model: &content})
@@ -66,14 +66,19 @@ func (s *Server) handleGetConfig(w http.ResponseWriter, r *http.Request) {
 }
 
 // saveJobRequest ist der Rumpf von POST /job/save. chunk ist ein roher
-// Textausschnitt, den das Frontend in 64-KiB-Stuecken sendet.
+// Textausschnitt, den das Frontend in 64-KiB-Stuecken sendet. Chunk ist ein
+// Zeiger, damit ein fehlendes Feld ("kein chunk gesendet") von einer
+// tatsaechlich leeren Zeichenkette ("chunk":"") unterschieden werden kann -
+// nur Ersteres darf die Datei nicht anfassen.
 type saveJobRequest struct {
-	Jobname string `json:"jobname"`
-	Append  bool   `json:"append"`
-	Chunk   string `json:"chunk"`
+	Jobname string  `json:"jobname"`
+	Append  bool    `json:"append"`
+	Chunk   *string `json:"chunk"`
 }
 
-// handleSaveJob schreibt einen Ausschnitt in eine Jobdatei.
+// handleSaveJob schreibt einen Ausschnitt in eine Jobdatei. Fehlt chunk im
+// Rumpf, wird die Datei bewusst nicht angefasst - das Node-Original warf in
+// diesem Fall vor jedem Dateizugriff eine Ausnahme.
 func (s *Server) handleSaveJob(w http.ResponseWriter, r *http.Request) {
 	var request saveJobRequest
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
@@ -81,7 +86,12 @@ func (s *Server) handleSaveJob(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := s.store.SaveJob(request.Jobname, request.Chunk, request.Append); err != nil {
+	if request.Chunk == nil {
+		writeJSON(w, resultResponse{Result: "missing chunk"})
+		return
+	}
+
+	if err := s.store.SaveJob(request.Jobname, *request.Chunk, request.Append); err != nil {
 		writeJSON(w, resultResponse{Result: errorText(err)})
 		return
 	}

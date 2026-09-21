@@ -14,7 +14,7 @@ const hoursPerDay = 24
 // abgerundeten Wert der naechst groesseren Einheit.
 //
 // momentjs rechnet Tage in Monate um ueber daysToMonths: 400 Jahre haben
-// 146097 Tage und 4800 Monate. Ein flacher 30-Tage-Monat waerae davon in
+// 146097 Tage und 4800 Monate. Ein flacher 30-Tage-Monat waere davon in
 // der oberen Haelfte des Monats-Bereichs um einen ganzen Monat ab.
 const (
 	daysPerMonth = 146097.0 / 4800.0 // 30.436875

@@ -43,7 +43,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /config/{name}", s.handleGetConfig)
 	mux.HandleFunc("PUT /log", s.handleLog)
 
-	return withLogging(withTiming(withCORS(withBodyLimit(mux))))
+	return withBodyLimit(withCORS(withLogging(withTiming(mux))))
 }
 
 // Die Antworttypen sind Strukturen statt Abbildungen, damit die Reihenfolge
