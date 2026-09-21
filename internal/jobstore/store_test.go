@@ -175,6 +175,8 @@ func TestPathsOutsideTheRootAreRejected(t *testing.T) {
 		"../../ausbruch",
 		"unter/tiefer",
 		filepath.Join(t.TempDir(), "absolut"),
+		"C:foo",
+		"C:foo.job.json",
 	}
 
 	for _, name := range names {
@@ -188,6 +190,9 @@ func TestPathsOutsideTheRootAreRejected(t *testing.T) {
 			if _, err := store.GetJob(name); !errors.Is(err, ErrInvalidFile) {
 				t.Errorf("GetJob(%q) = %v, erwartet ErrInvalidFile", name, err)
 			}
+			if _, err := store.GetModel(name); !errors.Is(err, ErrInvalidFile) {
+				t.Errorf("GetModel(%q) = %v, erwartet ErrInvalidFile", name, err)
+			}
 		})
 	}
 }
@@ -200,5 +205,27 @@ func TestRejectedPathsAreNotWritten(t *testing.T) {
 	parent := filepath.Dir(jobRoot)
 	if _, err := os.Stat(filepath.Join(parent, "ausbruch.job.json")); err == nil {
 		t.Fatal("abgelehnter Pfad wurde trotzdem geschrieben")
+	}
+}
+
+func TestNTFSAlternateDataStreamNamesAreRejected(t *testing.T) {
+	store, jobRoot, _ := newTestStore(t)
+
+	// NTFS-Doppelpunkte: SaveJob mit verschiedenen Varianten
+	_ = store.SaveJob("C:foo", "inhalt", false)
+	if _, err := os.Stat(filepath.Join(jobRoot, "C")); err == nil {
+		t.Fatal("Datei C sollte nicht durch SaveJob(\"C:foo\", ...) entstanden sein")
+	}
+
+	// AppendLog mit Doppelpunkt und Endung
+	_ = store.AppendLog("D:bar.log", []byte("{}"))
+	if _, err := os.Stat(filepath.Join(jobRoot, "D")); err == nil {
+		t.Fatal("Datei D sollte nicht durch AppendLog(\"D:bar.log\", ...) entstanden sein")
+	}
+
+	// GetJob darf nicht lesend zugreifen
+	_, _ = store.GetJob("E:baz.job.json")
+	if _, err := os.Stat(filepath.Join(jobRoot, "E")); err == nil {
+		t.Fatal("Datei E sollte nicht durch GetJob(\"E:baz.job.json\") entstanden sein")
 	}
 }
