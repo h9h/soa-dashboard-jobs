@@ -1,7 +1,10 @@
 package main
 
 import (
+	"bytes"
+	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -154,5 +157,83 @@ func TestHelpTextWithoutNewDirectory(t *testing.T) {
 
 	if strings.Contains(text, "(neu angelegt)") {
 		t.Error("Hilfetext meldet faelschlich ein neu angelegtes Verzeichnis")
+	}
+}
+
+func TestUsageTextNamesAllParameters(t *testing.T) {
+	text := usageText()
+
+	for _, fragment := range []string{
+		config.KeyJobPath,
+		config.KeyModelPath,
+		config.KeyPort,
+		"(Pflicht)",
+		"Vorgabe 4000",
+	} {
+		if !strings.Contains(text, fragment) {
+			t.Errorf("Kurzhilfe enthaelt %q nicht:\n%s", fragment, text)
+		}
+	}
+}
+
+func TestUsageTextShowsAllThreeWaysToSetThem(t *testing.T) {
+	text := usageText()
+
+	for name, fragment := range map[string]string{
+		"Konfigurationsdatei":   configFileName,
+		"abweichender Pfad":     "-config",
+		"Umgebungsvariable":     "set " + config.EnvPrefix + config.KeyJobPath + "=",
+		"Positionsargument":     "1-65535",
+		"Aufrufzeile":           "[-config <Pfad>] [Port]",
+		"Rangfolge der Quellen": "der spaetere gewinnt",
+	} {
+		if !strings.Contains(text, fragment) {
+			t.Errorf("Kurzhilfe beschreibt %s nicht (%q fehlt):\n%s", name, fragment, text)
+		}
+	}
+}
+
+func TestUsageTextUsesNameOfRunningExecutable(t *testing.T) {
+	name := executableName()
+
+	if name == "" || strings.ContainsAny(name, `/\`) {
+		t.Errorf("executableName() = %q, erwartet ein blosser Dateiname", name)
+	}
+	if !strings.Contains(usageText(), name) {
+		t.Errorf("Kurzhilfe nennt den Programmnamen %q nicht", name)
+	}
+}
+
+// TestFailPrintsUsageToStderrAndExits startet die Testbinaerdatei erneut,
+// weil fail den Prozess beendet.
+func TestFailPrintsUsageToStderrAndExits(t *testing.T) {
+	if os.Getenv("TEST_FAIL_SUBPROCESS") == "1" {
+		fail(errors.New("Testursache"))
+		return
+	}
+
+	cmd := exec.Command(os.Args[0], "-test.run=TestFailPrintsUsageToStderrAndExits")
+	cmd.Env = append(os.Environ(), "TEST_FAIL_SUBPROCESS=1")
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	err := cmd.Run()
+
+	var exitErr *exec.ExitError
+	if !errors.As(err, &exitErr) {
+		t.Fatalf("fail muss den Prozess beenden, Fehler: %v", err)
+	}
+	if code := exitErr.ExitCode(); code != 1 {
+		t.Errorf("Exit-Code = %d, erwartet 1", code)
+	}
+	if !strings.Contains(stderr.String(), "Start abgebrochen: Testursache") {
+		t.Errorf("stderr nennt die Ursache nicht:\n%s", stderr.String())
+	}
+	if !strings.Contains(stderr.String(), config.EnvPrefix) {
+		t.Errorf("stderr enthaelt die Kurzhilfe nicht:\n%s", stderr.String())
+	}
+	if strings.Contains(stdout.String(), "Start abgebrochen") {
+		t.Errorf("Die Kurzhilfe darf nicht nach stdout gehen:\n%s", stdout.String())
 	}
 }

@@ -25,17 +25,16 @@ const configFileName = "jobs.config.json"
 
 func main() {
 	configPath := flag.String("config", defaultConfigPath(), "Pfad zur Konfigurationsdatei")
+	flag.Usage = func() { fmt.Fprint(os.Stderr, usageText()) }
 	flag.Parse()
 
 	cfg, err := config.Load(*configPath)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		fail(err)
 	}
 
 	if err := applyPortArgument(cfg, flag.Args()); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		fail(err)
 	}
 
 	dirCreated, err := ensureDir(cfg.JobPath)
@@ -49,8 +48,19 @@ func main() {
 	fmt.Print(helpText(cfg, dirCreated))
 
 	if err := http.ListenAndServe(listenAddress(cfg.Port), server.Handler()); err != nil {
-		log.Fatalf("Server beendet: %v", err)
+		fail(fmt.Errorf("Server auf %s beendet: %w", listenAddress(cfg.Port), err))
 	}
+}
+
+// fail bricht den Start ab. Neben der Ursache wird die Kurzhilfe ausgegeben,
+// weil jeder Abbruchgrund - fehlende Pflichtschluessel, ungueltiger oder
+// belegter Port - ueber die in usageText beschriebenen Parameter behoben wird.
+// Beides geht nach stderr, damit die Ausgabe eines aufrufenden Skripts auf
+// stdout unberuehrt bleibt.
+func fail(err error) {
+	fmt.Fprintf(os.Stderr, "Start abgebrochen: %v\n", err)
+	fmt.Fprint(os.Stderr, usageText())
+	os.Exit(1)
 }
 
 // listenAddress bindet bewusst nur an die Loopback-Adresse: der Dienst
@@ -111,6 +121,52 @@ func defaultConfigPath() string {
 		}
 	}
 	return configFileName
+}
+
+// usageText beschreibt Aufruf und Parameter. Es wird bei jedem Startabbruch
+// und bei -h ausgegeben.
+func usageText() string {
+	return fmt.Sprintf(`
+Aufruf:
+  %[1]s [-config <Pfad>] [Port]
+
+Parameter:
+  %-17[2]s Verzeichnis fuer Jobs und Logdateien (Pflicht)
+  %-17[3]s Verzeichnis mit den Modelldaten (Pflicht)
+  %-17[4]s Port des Servers (Vorgabe %[5]s)
+
+Drei Wege, sie zu setzen - der spaetere gewinnt:
+
+  1. Konfigurationsdatei %[6]s, gesucht im Arbeitsverzeichnis,
+     danach neben der ausfuehrbaren Datei. Anderer Pfad ueber -config:
+       %[1]s -config C:\Dienste\%[6]s
+     Inhalt:
+       {
+         "%[2]s": "C:/Dashboard",
+         "%[3]s": "C:/DashboardModel",
+         "%[4]s": "%[5]s"
+       }
+
+  2. Umgebungsvariablen mit dem Praefix %[7]s - sie ueberschreiben
+     die Datei, jeder Schluessel ist so setzbar:
+       set %[7]s%[2]s=C:\Dashboard
+       set %[7]s%[3]s=C:\DashboardModel
+       set %[7]s%[4]s=%[5]s
+
+  3. Erstes Positionsargument - setzt nur den Port (1-65535):
+       %[1]s 4001
+`, executableName(), config.KeyJobPath, config.KeyModelPath, config.KeyPort,
+		config.DefaultPort, configFileName, config.EnvPrefix)
+}
+
+// executableName liefert den Namen der laufenden Datei, damit die Beispiele
+// im Hilfetext auch nach einem Umbenennen der EXE aufrufbar bleiben.
+func executableName() string {
+	executable, err := os.Executable()
+	if err != nil {
+		return "soa-dashboard-jobs.exe"
+	}
+	return filepath.Base(executable)
 }
 
 // helpText ist das Startbanner, nachgebildet nach getHelpText des

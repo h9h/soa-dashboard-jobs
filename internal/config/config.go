@@ -27,7 +27,8 @@ const (
 	// Umgebungsvariable zu ueberschreiben, z.B. SOA_JOBS_JOB_PATH.
 	EnvPrefix = "SOA_JOBS_"
 
-	defaultPort = "4000"
+	// DefaultPort ist der Port, der ohne eigene Angabe verwendet wird.
+	DefaultPort = "4000"
 )
 
 // Config haelt die aufgeloeste Konfiguration. Extra enthaelt saemtliche
@@ -62,7 +63,7 @@ func Load(path string) (*Config, error) {
 	applyEnvironment(values, os.Environ())
 
 	if values[KeyPort] == "" {
-		values[KeyPort] = defaultPort
+		values[KeyPort] = DefaultPort
 	}
 
 	for _, key := range []string{KeyJobPath, KeyModelPath} {

@@ -95,6 +95,37 @@ das Positionsargument dahinter ueberschreibt darin nur den Port:
 .\soa-dashboard-jobs.exe -config D:/conf/jobs.config.json 4001
 ```
 
+### Wenn der Start abbricht
+
+Bricht der Start ab, schreibt der Dienst die Ursache und eine Kurzhilfe zu den
+Parametern nach **stderr** und endet mit Exit-Code 1. Die Ausgabe auf stdout
+bleibt dabei frei, damit ein aufrufendes Skript sie weiter auswerten kann.
+Dieselbe Kurzhilfe liefert `-h`.
+
+Abgedeckt sind alle drei Abbruchgruende:
+
+- fehlender Pflichtschluessel oder unlesbare Konfigurationsdatei,
+- ungueltiges Positionsargument fuer den Port,
+- Port bereits belegt (`ListenAndServe` scheitert).
+
+```
+Start abgebrochen: Konfiguration jobs.config.json: Pflichtschluessel JOB_PATH fehlt
+
+Aufruf:
+  soa-dashboard-jobs.exe [-config <Pfad>] [Port]
+
+Parameter:
+  JOB_PATH          Verzeichnis fuer Jobs und Logdateien (Pflicht)
+  MODEL_PATH        Verzeichnis mit den Modelldaten (Pflicht)
+  LOCAL_SERVER_PORT Port des Servers (Vorgabe 4000)
+
+Drei Wege, sie zu setzen - der spaetere gewinnt:
+  ...
+```
+
+Der Programmname in der Kurzhilfe ist der der laufenden Datei, die Beispiele
+bleiben also auch nach einem Umbenennen der `.exe` aufrufbar.
+
 ### Umstieg von der Node-Fassung
 
 `customisation/jobs.config.js` wird zu `jobs.config.json` - dieselben
