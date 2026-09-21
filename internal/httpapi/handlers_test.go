@@ -208,3 +208,104 @@ func TestUnknownRouteIs404(t *testing.T) {
 		t.Errorf("Status = %d, erwartet 404", status)
 	}
 }
+
+func TestSaveJobWritesFile(t *testing.T) {
+	handler, jobRoot, _ := newTestServer(t)
+
+	_, body := do(t, handler, http.MethodPost, "/job/save",
+		`{"jobname":"lauf","chunk":"{\"a\":1}","append":false}`)
+
+	if string(body) != `{"result":"ok"}` {
+		t.Fatalf("Antwort = %s", body)
+	}
+
+	content, err := os.ReadFile(filepath.Join(jobRoot, "lauf.job.json"))
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	if string(content) != `{"a":1}` {
+		t.Errorf("Datei = %q", content)
+	}
+}
+
+func TestSaveJobAppendsChunks(t *testing.T) {
+	handler, jobRoot, _ := newTestServer(t)
+
+	do(t, handler, http.MethodPost, "/job/save", `{"jobname":"lauf","chunk":"eins","append":false}`)
+	do(t, handler, http.MethodPost, "/job/save", `{"jobname":"lauf","chunk":"zwei","append":true}`)
+
+	content, err := os.ReadFile(filepath.Join(jobRoot, "lauf.job.json"))
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	if string(content) != "einszwei" {
+		t.Errorf("Datei = %q", content)
+	}
+}
+
+func TestSaveJobRejectsPathTraversal(t *testing.T) {
+	handler, _, _ := newTestServer(t)
+
+	status, body := do(t, handler, http.MethodPost, "/job/save",
+		`{"jobname":"../ausbruch","chunk":"x","append":false}`)
+
+	if status != http.StatusOK {
+		t.Errorf("Status = %d, erwartet 200", status)
+	}
+	if string(body) != `{"result":"invalid file"}` {
+		t.Errorf("Antwort = %s", body)
+	}
+}
+
+func TestLogAppendsWithoutDestinationAndKeepsOrder(t *testing.T) {
+	handler, jobRoot, _ := newTestServer(t)
+
+	_, body := do(t, handler, http.MethodPut, "/log",
+		`{"destination":"lauf","timestamp":1758445200000,"zeta":"z","alpha":"<a>&</a>"}`)
+
+	if string(body) != `{"result":"ok"}` {
+		t.Fatalf("Antwort = %s", body)
+	}
+
+	content, err := os.ReadFile(filepath.Join(jobRoot, "lauf.log"))
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	want := "{\"timestamp\":1758445200000,\"zeta\":\"z\",\"alpha\":\"<a>&</a>\"},\n"
+	if string(content) != want {
+		t.Errorf("Datei =\n  %q\nerwartet\n  %q", content, want)
+	}
+}
+
+func TestLogRejectsPathTraversal(t *testing.T) {
+	handler, _, _ := newTestServer(t)
+
+	_, body := do(t, handler, http.MethodPut, "/log", `{"destination":"../ausbruch","a":1}`)
+
+	if string(body) != `{"result":"invalid file"}` {
+		t.Errorf("Antwort = %s", body)
+	}
+}
+
+func TestLogRejectsBrokenJSON(t *testing.T) {
+	handler, _, _ := newTestServer(t)
+
+	status, body := do(t, handler, http.MethodPut, "/log", `{"destination":`)
+
+	if status != http.StatusOK {
+		t.Errorf("Status = %d, erwartet 200", status)
+	}
+	if string(body) == `{"result":"ok"}` {
+		t.Errorf("kaputtes JSON darf nicht als ok gemeldet werden: %s", body)
+	}
+}
+
+func TestSaveJobRejectsBrokenJSON(t *testing.T) {
+	handler, _, _ := newTestServer(t)
+
+	_, body := do(t, handler, http.MethodPost, "/job/save", `{"jobname":`)
+
+	if string(body) == `{"result":"ok"}` {
+		t.Errorf("kaputtes JSON darf nicht als ok gemeldet werden: %s", body)
+	}
+}

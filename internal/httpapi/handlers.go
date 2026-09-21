@@ -1,8 +1,14 @@
 package httpapi
 
 import (
+	"encoding/json"
+	"errors"
+	"io"
 	"net/http"
 	"time"
+
+	"soa-dashboard-jobs/internal/jobstore"
+	"soa-dashboard-jobs/internal/jsonutil"
 )
 
 // handleCheckAlive meldet Laufzeit, Version und die wirksame Konfiguration.
@@ -59,11 +65,63 @@ func (s *Server) handleGetConfig(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, configResponse{Status: status, Config: &value})
 }
 
-// handleSaveJob und handleLog folgen in Task 7.
-func (s *Server) handleSaveJob(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, resultResponse{Result: "not implemented"})
+// saveJobRequest ist der Rumpf von POST /job/save. chunk ist ein roher
+// Textausschnitt, den das Frontend in 64-KiB-Stuecken sendet.
+type saveJobRequest struct {
+	Jobname string `json:"jobname"`
+	Append  bool   `json:"append"`
+	Chunk   string `json:"chunk"`
 }
 
+// handleSaveJob schreibt einen Ausschnitt in eine Jobdatei.
+func (s *Server) handleSaveJob(w http.ResponseWriter, r *http.Request) {
+	var request saveJobRequest
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		writeJSON(w, resultResponse{Result: err.Error()})
+		return
+	}
+
+	if err := s.store.SaveJob(request.Jobname, request.Chunk, request.Append); err != nil {
+		writeJSON(w, resultResponse{Result: errorText(err)})
+		return
+	}
+	writeJSON(w, resultResponse{Result: "ok"})
+}
+
+// handleLog haengt den Rumpf ohne das Feld destination an eine Logdatei an.
 func (s *Server) handleLog(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, resultResponse{Result: "not implemented"})
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		writeJSON(w, resultResponse{Result: err.Error()})
+		return
+	}
+
+	var envelope struct {
+		Destination string `json:"destination"`
+	}
+	if err := json.Unmarshal(body, &envelope); err != nil {
+		writeJSON(w, resultResponse{Result: err.Error()})
+		return
+	}
+
+	payload, err := jsonutil.StripKey(body, "destination")
+	if err != nil {
+		writeJSON(w, resultResponse{Result: err.Error()})
+		return
+	}
+
+	if err := s.store.AppendLog(envelope.Destination, payload); err != nil {
+		writeJSON(w, resultResponse{Result: errorText(err)})
+		return
+	}
+	writeJSON(w, resultResponse{Result: "ok"})
+}
+
+// errorText liefert fuer abgelehnte Pfade genau die Meldung des
+// Node-Originals und sonst den Text des Go-Fehlers.
+func errorText(err error) string {
+	if errors.Is(err, jobstore.ErrInvalidFile) {
+		return jobstore.ErrInvalidFile.Error()
+	}
+	return err.Error()
 }
