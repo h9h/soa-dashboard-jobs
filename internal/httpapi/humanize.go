@@ -11,6 +11,15 @@ const hoursPerDay = 24
 // relativeTime bildet moment().from() in der englischen Lokalisierung nach,
 // die das Node-Original fuer das Feld process-start verwendet hat. Die
 // Schwellwerte stammen aus momentjs (relativeTime thresholds).
+//
+// momentjs rechnet Tage in Monate um ueber daysToMonths: 400 Jahre haben
+// 146097 Tage und 4800 Monate. Ein flacher 30-Tage-Monat waerae davon in
+// der oberen Haelfte des Monats-Bereichs um einen ganzen Monat ab.
+const (
+	daysPerMonth = 146097.0 / 4800.0 // 30.436875
+	daysPerYear  = daysPerMonth * 12 // 365.2425
+)
+
 func relativeTime(d time.Duration) string {
 	if d < 0 {
 		d = 0
@@ -20,8 +29,8 @@ func relativeTime(d time.Duration) string {
 	minutes := int(math.Round(d.Minutes()))
 	hours := int(math.Round(d.Hours()))
 	days := int(math.Round(d.Hours() / hoursPerDay))
-	months := int(math.Round(d.Hours() / hoursPerDay / 30))
-	years := int(math.Round(d.Hours() / hoursPerDay / 365))
+	months := int(math.Round(float64(days) / daysPerMonth))
+	years := int(math.Round(float64(days) / daysPerYear))
 
 	switch {
 	case seconds < 45:
