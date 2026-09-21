@@ -8,3 +8,6 @@ jobs.config.json
 # Editors
 .vscode/
 .idea/
+
+# SDD-Arbeitsverzeichnis
+.superpowers/

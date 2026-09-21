@@ -185,9 +185,11 @@ All JSON is written with `json.Encoder` and `SetEscapeHTML(false)` so `<`, `>` a
 
 Details:
 
-- `GET /job/{jobname}` appends `.job.json` unless already present;
-  `GET /model/{name}` appends `.json`; `PUT /log` appends `.log`. All three match
-  the `endsWith` checks in the Node code.
+- `GET /model/{name}` appends `.json`, `PUT /log` appends `.log` and
+  `POST /job/save` appends `.job.json`, each unless already present, matching the
+  `endsWith` checks in the Node code. `GET /job/{jobname}` deliberately does
+  **not** append an extension, also matching Node — the SPA appends `.job.json`
+  client-side before calling.
 - `POST /job/save` writes `chunk` verbatim (no JSON encoding), truncating unless
   `append` is true. The SPA streams large jobs as 64 KiB appended chunks.
 - `PUT /log` appends `<content>,\n` where `<content>` is the request body **minus**
