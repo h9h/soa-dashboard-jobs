@@ -57,7 +57,7 @@ the JSON *shape* is what must match.
 flowchart LR
   FE["React SPA<br/>rest-api-local.js"] -->|HTTP :4000| MW
   subgraph bin["soa-dashboard-jobs.exe"]
-    MW["httpapi: middleware<br/>CORS · X-Response-Time · Logging · 32 MB limit"] --> R["httpapi: routes + handlers"]
+    MW["httpapi: middleware<br/>32 MB limit · CORS · Logging · X-Response-Time"] --> R["httpapi: routes + handlers"]
     R --> S["jobstore<br/>List/Get/Save/AppendLog<br/>+ path containment"]
     R --> C["config<br/>typed keys + Extra map"]
   end
@@ -79,7 +79,7 @@ soa-dashboard-jobs/
   internal/jobstore/store.go    ListJobs · GetJob · SaveJob · AppendLog · staysInDirectory
   internal/httpapi/router.go    route table, Server struct
   internal/httpapi/handlers.go  one handler per endpoint
-  internal/httpapi/middleware.go CORS · timing · logging · body limit
+  internal/httpapi/middleware.go body limit · CORS · logging · timing
   internal/httpapi/humanize.go  moment .from() equivalent
   jobs.config.example.json
   build.ps1

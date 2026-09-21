@@ -1,7 +1,9 @@
 package httpapi
 
 import (
+	"bytes"
 	"encoding/json"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -257,6 +259,36 @@ func TestHandlerAnswersPreflightWithoutReachingRoute(t *testing.T) {
 	}
 	if got := recorder.Header().Get("Content-Type"); got == "application/json; charset=utf-8" {
 		t.Errorf("Content-Type = %q, der Preflight hat offenbar eine Route erreicht", got)
+	}
+}
+
+// TestHandlerDoesNotLogPreflight treibt einen Preflight durch den echten,
+// von Server.Handler() verdrahteten Handler und prueft, dass dabei nichts
+// protokolliert wird. Anders als TestHandlerAnswersPreflightWithoutReachingRoute
+// (Status und Header sind bei einem Preflight unabhaengig von der
+// Middlewarereihenfolge gleich) unterscheidet dieser Test tatsaechlich
+// zwischen der korrigierten und der urspruenglichen Reihenfolge: nur wenn
+// withCORS ausserhalb von withLogging liegt, erreicht der Preflight die
+// Logging-Middleware nicht.
+func TestHandlerDoesNotLogPreflight(t *testing.T) {
+	var buf bytes.Buffer
+	log.SetOutput(&buf)
+	t.Cleanup(func() { log.SetOutput(os.Stderr) })
+
+	handler, _, _ := newTestServer(t)
+
+	request := httptest.NewRequest(http.MethodOptions, "/job/save", nil)
+	request.Header.Set("Origin", "http://localhost:3000")
+	request.Header.Set("Access-Control-Request-Method", "POST")
+
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusNoContent {
+		t.Fatalf("Status = %d, erwartet 204", recorder.Code)
+	}
+	if buf.String() != "" {
+		t.Errorf("Protokoll sollte bei einem Preflight durch Handler() leer sein, war aber: %q", buf.String())
 	}
 }
 
