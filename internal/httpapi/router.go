@@ -74,11 +74,13 @@ type configResponse struct {
 }
 
 type checkAliveResponse struct {
-	Result       bool              `json:"result"`
-	Env          map[string]string `json:"env"`
-	ProcessStart string            `json:"process-start"`
-	UptimeInMS   int64             `json:"uptime-in-ms"`
-	Version      string            `json:"version"`
+	Result bool              `json:"result"`
+	Env    map[string]string `json:"env"`
+	// ProcessStart ist der Startzeitpunkt als RFC-3339-Zeitstempel. Das
+	// Node-Original meldete hier eine relative Angabe aus momentjs.
+	ProcessStart string `json:"process-start"`
+	UptimeInMS   int64  `json:"uptime-in-ms"`
+	Version      string `json:"version"`
 }
 
 // writeJSON schreibt die Antwort ohne HTML-Escaping und immer mit Status 200.

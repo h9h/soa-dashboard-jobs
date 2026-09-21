@@ -18,7 +18,7 @@ func (s *Server) handleCheckAlive(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, checkAliveResponse{
 		Result:       true,
 		Env:          s.cfg.Extra,
-		ProcessStart: relativeTime(uptime),
+		ProcessStart: s.start.Format(time.RFC3339),
 		UptimeInMS:   uptime.Milliseconds(),
 		Version:      s.version,
 	})

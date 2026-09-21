@@ -145,7 +145,7 @@ stuetzt.
 
 | Route | Rumpf | Antwort |
 |---|---|---|
-| `GET /checkalive` | – | `{"result":true,"env":{…},"process-start":"a few seconds ago","uptime-in-ms":1234,"version":"1.2.3"}` |
+| `GET /checkalive` | – | `{"result":true,"env":{…},"process-start":"2026-09-21T17:49:03+02:00","uptime-in-ms":1234,"version":"1.2.3"}` |
 | `GET /jobs` | – | `{"jobs":["eins.job.json"]}` |
 | `GET /job/:jobname` | – | `{"status":"ok","job":"<Dateiinhalt>"}` |
 | `POST /job/save` | `{"jobname","chunk","append"}` | `{"result":"ok"}` |
@@ -208,9 +208,10 @@ go build -ldflags "-X main.version=1.2.3" -o soa-dashboard-jobs.exe .
    Die Node-Fassung akzeptierte auch `0` und band dabei einen zufaelligen,
    vom Betriebssystem vergebenen Port, waehrend sie weiterhin Port 0
    meldete.
-7. **`process-start` in `/checkalive`.** Die relative Zeitangabe bildet die
-   Schwellenwerte von momentjs nach, einschliesslich seines gregorianischen
-   Monats von 146097/4800 Tagen.
+7. **`process-start` in `/checkalive`.** Gemeldet wird der Startzeitpunkt
+   als RFC-3339-Zeitstempel. Die Node-Fassung gab hier eine relative
+   Angabe aus momentjs aus ("a few seconds ago"); ein Zeitstempel ist
+   eindeutig und ohne die Schwellenwertlogik von momentjs zu erzeugen.
 8. **Zu grosser Anfragerumpf.** Ueber 32 MiB warf koa-bodyparser eine
    Ausnahme, die Koa mit Status 413 beantwortete. Dieser Dienst antwortet
    stattdessen mit Status 200 und `{"result":"http: request body too large"}`,

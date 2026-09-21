@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"soa-dashboard-jobs/internal/config"
 	"soa-dashboard-jobs/internal/jobstore"
@@ -95,8 +96,8 @@ func TestCheckAliveShape(t *testing.T) {
 	if parsed.Version != "1.2.3" {
 		t.Errorf("version = %q", parsed.Version)
 	}
-	if parsed.ProcessStart != "a few seconds ago" {
-		t.Errorf("process-start = %q", parsed.ProcessStart)
+	if _, err := time.Parse(time.RFC3339, parsed.ProcessStart); err != nil {
+		t.Errorf("process-start = %q, erwartet ein RFC-3339-Zeitstempel: %v", parsed.ProcessStart, err)
 	}
 	if parsed.UptimeInMS < 0 {
 		t.Errorf("uptime-in-ms = %d", parsed.UptimeInMS)
