@@ -3,7 +3,7 @@
 Housekeeping-Backend des ESB/SOA-Dashboards, in Go. Es liest und schreibt
 Jobdefinitionen, Logdateien und Modelldaten in lokalen Verzeichnissen und
 beantwortet die REST-Aufrufe, die die React-Oberflaeche aus
-[`soa-dashboard`](../soa-dashboard) an ihr "File-Backend" richtet.
+[`soa-dashboard`](https://github.com/h9h/soa-dashboard/) an ihr "File-Backend" richtet.
 
 Der Dienst ist eine Portierung von `backend-jobs` aus dem `soa-dashboard`-Repository
 (Koa/Node). Das Protokoll ist unveraendert: die Oberflaeche spricht ohne Anpassung
